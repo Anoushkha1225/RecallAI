@@ -1,18 +1,18 @@
 import streamlit as st
 import json
+import zipfile
 from summarizer import summarize_video, parse_watch_history_html
 from embedder import get_embedding
 from search import add_to_index, search_memory, clear_memory
-import zipfile
 
 # Page config
 st.set_page_config(page_title="RecallAI", page_icon="🧠", layout="centered")
 st.title("RecallAI 🔍")
 st.write("Upload your YouTube watch history (Google Takeout HTML/JSON/ZIP) and search with vague memories!")
 
-user_id = "demo-user"
+user_id = "demo-user"  # Replace with real auth later
 
-# Step 1: Upload history
+# Upload step
 st.header("1. Upload your YouTube Watch History")
 uploaded_file = st.file_uploader("Upload your YouTube 'watch-history.html', 'watch-history.json' or ZIP", type=["html", "zip", "json"])
 
@@ -20,6 +20,7 @@ data = None
 
 if uploaded_file:
     try:
+        # ZIP File
         if uploaded_file.name.endswith(".zip"):
             with zipfile.ZipFile(uploaded_file) as z:
                 for name in z.namelist():
@@ -33,17 +34,19 @@ if uploaded_file:
                             data = parse_watch_history_html(html_bytes)
                         break
                 if data is None:
-                    st.error("Could not find 'watch-history.json' inside the ZIP file.")
+                    st.error("Could not find 'watch-history.json' or 'watch-history.html' inside the ZIP file.")
                     st.stop()
 
+        # HTML File
         elif uploaded_file.name.endswith(".html"):
             html_bytes = uploaded_file.read()
             data = parse_watch_history_html(html_bytes)
 
+        # JSON File
         elif uploaded_file.name.endswith(".json"):
             data = json.load(uploaded_file)
 
-        # If data was loaded successfully
+        # Process if data found
         if data:
             clear_memory(user_id)
             st.success("Processing and summarizing your history...")
@@ -58,12 +61,12 @@ if uploaded_file:
 
             st.success("Memory updated with your watch history!")
         else:
-            st.warning("No data found in the file.")
+            st.warning("No valid data found in the file.")
 
     except Exception as e:
         st.error(f"Failed to process file: {e}")
 
-# Step 2: Search
+# Search
 st.header("2. Search your memories")
 query = st.text_input("What do you remember about the video?")
 
