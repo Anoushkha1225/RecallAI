@@ -4,72 +4,56 @@ from summarizer import summarize_video, parse_watch_history_html
 from embedder import get_embedding
 from search import add_to_index, search_memory, clear_memory
 import zipfile
-import io
-# Set up page
+
+# Page config
 st.set_page_config(page_title="RecallAI", page_icon="🧠", layout="centered")
 st.title("RecallAI 🔍")
-st.write("Upload your YouTube watch history (Google Takeout JSON) and search with vague memories!")
+st.write("Upload your YouTube watch history (Google Takeout HTML/JSON/ZIP) and search with vague memories!")
 
-# Simulated user ID (replace with login-based later)
 user_id = "demo-user"
 
 # Step 1: Upload history
-# Step 1: Upload watch history JSON or ZIP
 st.header("1. Upload your YouTube Watch History")
-uploaded_file = st.file_uploader("Upload your YouTube 'watch-history.html' or ZIP file", type=["html", "zip", "json"])
+uploaded_file = st.file_uploader("Upload your YouTube 'watch-history.html', 'watch-history.json' or ZIP", type=["html", "zip", "json"])
 
-
-if uploaded_file:
-    # Determine file type
-    if uploaded_file.name.endswith(".zip"):
-        with zipfile.ZipFile(uploaded_file) as z:
-            data = None
-            for name in z.namelist():
-                if "watch-history.json" in name:
-                    with z.open(name) as f:
-                        data = json.load(f)
-                    break
-            if data is None:
-                st.error("Could not find 'watch-history.json' inside the ZIP file.")
-                st.stop()
-    elif uploaded_file.name.endswith(".html"):
-        html_bytes = uploaded_file.read()
-        data = parse_watch_history_html(html_bytes)
-
-    else:
-        # Assume JSON
-        data = json.load(uploaded_file)
-    
-    # Process watch history
-    clear_memory(user_id)  # Reset memory
-    st.success("Processing and summarizing your history...")
-
-    for entry in data:
-        if "titleUrl" in entry and "title" in entry:
-            url = entry["titleUrl"]
-            title = entry["title"]
-            summary = summarize_video(title)
-            embedding = get_embedding(summary)
-            add_to_index(user_id, title, summary, url, embedding)
-
-    st.success("Memory updated with your watch history!")
-
+data = None
 
 if uploaded_file:
     try:
-        data = json.load(uploaded_file)
-        clear_memory(user_id)
-        st.success("Processing your watch history...")
+        if uploaded_file.name.endswith(".zip"):
+            with zipfile.ZipFile(uploaded_file) as z:
+                for name in z.namelist():
+                    if "watch-history.json" in name:
+                        with z.open(name) as f:
+                            data = json.load(f)
+                        break
+                if data is None:
+                    st.error("Could not find 'watch-history.json' inside the ZIP file.")
+                    st.stop()
 
-        for entry in data:
-            if "title" in entry and "titleUrl" in entry:
-                title = entry["title"]
-                url = entry["titleUrl"]
-                summary = summarize_video(title)
-                embedding = get_embedding(summary)
-                add_to_index(user_id, title, summary, url, embedding)
+        elif uploaded_file.name.endswith(".html"):
+            html_bytes = uploaded_file.read()
+            data = parse_watch_history_html(html_bytes)
 
-        st.success("Memory updated with your watch history!")
+        elif uploaded_file.name.endswith(".json"):
+            data = json.load(uploaded_file)
+
+        # If data was loaded successfully
+        if data:
+            clear_memory(user_id)
+            st.success("Processing and summarizing your history...")
+
+            for entry in data:
+                if "titleUrl" in entry and "title" in entry:
+                    url = entry["titleUrl"]
+                    title = entry["title"]
+                    summary = summarize_video(title)
+                    embedding = get_embedding(summary)
+                    add_to_index(user_id, title, summary, url, embedding)
+
+            st.success("Memory updated with your watch history!")
+        else:
+            st.warning("No data found in the file.")
 
     except Exception as e:
         st.error(f"Failed to process file: {e}")

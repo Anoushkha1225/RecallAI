@@ -1,6 +1,7 @@
 import re
 import urllib.parse
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
+from typing import cast
 
 def summarize_video(title: str) -> str:
     title = re.sub(r'[^\u0000-\u00ff\w\s]', '', title)
@@ -22,12 +23,13 @@ def parse_watch_history_html(html_bytes):
     soup = BeautifulSoup(html_bytes, "html.parser")
     entries = []
     for div in soup.find_all("div", class_="content-cell"):
-        a_tag = div.find("a")
-        if a_tag and "href" in a_tag.attrs:
-            url = a_tag["href"]
-            title = a_tag.text.strip()
-            entries.append({
-                "title": title,
-                "titleUrl": url
-            })
+        if isinstance(div, Tag):
+            a_tag = div.find("a")
+            if isinstance(a_tag, Tag) and "href" in a_tag.attrs:
+                url = a_tag["href"]
+                title = a_tag.text.strip()
+                entries.append({
+                    "title": title,
+                    "titleUrl": url
+                })
     return entries
