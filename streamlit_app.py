@@ -32,14 +32,15 @@ if uploaded_file:
 
     clear_memory(user_id)
     count = 0
-    for entry in data:
-        if "titleUrl" in entry and "title" in entry:
-            url = entry["titleUrl"]
-            title = entry["title"]
-            summary = summarize_video(title)
-            embedding = get_embedding(summary)
-            add_to_index(user_id, title, summary, url, embedding)
-            count += 1
+    with st.spinner("Processing and summarizing your history..."):
+        for entry in data:
+            if "titleUrl" in entry and "title" in entry:
+                url = entry["titleUrl"]
+                title = entry["title"]
+                summary = summarize_video(title)
+                embedding = get_embedding(summary)
+                add_to_index(user_id, title, summary, url, embedding)
+                count += 1
 
     st.success(f"✅ Added {count} videos to your memory.")
 
@@ -51,7 +52,7 @@ query = st.text_input("What do you remember about the video?")
 
 if query:
     query_embedding = get_embedding(query)
-    results = search_memory(user_id, query_embedding)
+    results = search_memory(user_id, query_embedding, top_k=5)
 
     if results:
         st.subheader("🔍 Top Matches:")
