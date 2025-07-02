@@ -27,6 +27,11 @@ if uploaded_file:
                         with z.open(name) as f:
                             data = json.load(f)
                         break
+                    elif "watch-history.html" in name:
+                        with z.open(name) as f:
+                            html_bytes = f.read()
+                            data = parse_watch_history_html(html_bytes)
+                        break
                 if data is None:
                     st.error("Could not find 'watch-history.json' inside the ZIP file.")
                     st.stop()
