@@ -1,11 +1,14 @@
- HEAD
-# .streamlit/config.toml
 [server]
 headless = true
 port = 8501
 enableCORS = false
-[server]
-headless = true
-port = 8501
-enableCORS = false 
-4dcba67 (Rename main.py to streamlit_app.py and add Streamlit config)
+
+[theme]
+base = "light"
+primaryColor = "#4B8BBE"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+
+[client]
+toolbarMode = "minimal"
