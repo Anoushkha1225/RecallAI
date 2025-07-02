@@ -1,9 +1,9 @@
 import streamlit as st
 import json
+import zipfile
 from summarizer import summarize_video, parse_watch_history_html
 from embedder import get_embedding
 from search import add_to_index, search_memory, clear_memory
-import zipfile
 
 # Page config
 st.set_page_config(page_title="RecallAI", page_icon="🧠", layout="centered")
@@ -12,8 +12,8 @@ st.write("Upload your YouTube watch history (Google Takeout HTML/JSON/ZIP) and s
 
 user_id = "demo-user"
 
-# Choose number of videos
-num_videos = st.slider("How many videos do you want to process?", min_value=5, max_value=100, value=20, step=5)
+# ✅ Slider to limit videos processed
+num_videos = st.slider("How many videos to process?", min_value=5, max_value=100, value=20, step=5)
 
 # Step 1: Upload history
 st.header("1. Upload your YouTube Watch History")
@@ -23,6 +23,7 @@ data = None
 
 if uploaded_file:
     try:
+        # ✅ Read file depending on type
         if uploaded_file.name.endswith(".zip"):
             with zipfile.ZipFile(uploaded_file) as z:
                 for name in z.namelist():
@@ -33,53 +34,52 @@ if uploaded_file:
                     elif "watch-history.html" in name:
                         with z.open(name) as f:
                             html_bytes = f.read()
-                            data = parse_watch_history_html(html_bytes)[:num_videos]
+                            data = parse_watch_history_html(html_bytes)
                         break
                 if data is None:
-                    st.error("Could not find watch-history file inside the ZIP.")
+                    st.error("Could not find watch-history.json or HTML inside the ZIP.")
                     st.stop()
 
         elif uploaded_file.name.endswith(".html"):
             html_bytes = uploaded_file.read()
-            data = parse_watch_history_html(html_bytes)[:num_videos]
+            data = parse_watch_history_html(html_bytes)
 
         elif uploaded_file.name.endswith(".json"):
             data = json.load(uploaded_file)
 
-        if data:
+        # ✅ Process the data
+        if data and isinstance(data, list):
             clear_memory(user_id)
-            with st.spinner("Summarizing and updating memory..."):
-                progress = st.progress(0)
-                total = min(len(data), num_videos if uploaded_file.name.endswith((".html", ".zip")) else len(data))
-                
-                for i, entry in enumerate(data[:total]):
-                    if "titleUrl" in entry and "title" in entry:
-                        url = entry["titleUrl"]
+            valid_entries = [entry for entry in data if "title" in entry and "titleUrl" in entry]
+            if not valid_entries:
+                st.warning("No valid video entries found.")
+            else:
+                with st.spinner("🔄 Summarizing and updating memory..."):
+                    progress = st.progress(0)
+                    for i, entry in enumerate(valid_entries[:num_videos]):
                         title = entry["title"]
+                        url = entry["titleUrl"]
                         summary = summarize_video(title)
                         embedding = get_embedding(summary)
                         add_to_index(user_id, title, summary, url, embedding)
-                    progress.progress((i + 1) / total)
-
-            st.success("Memory updated with your watch history!")
-
+                        progress.progress((i + 1) / min(len(valid_entries), num_videos))
+                st.success(f"✅ Memory updated with {min(len(valid_entries), num_videos)} videos!")
         else:
-            st.warning("No data found in the file.")
+            st.warning("⚠️ No usable data found in uploaded file.")
 
     except Exception as e:
-        st.error(f"Failed to process file: {e}")
+        st.error(f"❌ Failed to process file: {e}")
 
 # Step 2: Search
 st.header("2. Search your memories")
 query = st.text_input("What do you remember about the video?")
 
 if query:
-    with st.spinner("Searching..."):
-        query_embedding = get_embedding(query)
-        results = search_memory(user_id, query_embedding)
+    query_embedding = get_embedding(query)
+    results = search_memory(user_id, query_embedding)
 
     if results:
-        st.subheader("Top Matches")
+        st.subheader("🔍 Top Matches")
         for res in results:
             st.markdown(f"### [{res['title']}]({res['url']})")
             st.markdown(f"**Summary:** {res['summary']}")
