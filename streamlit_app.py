@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from summarizer import summarize_video
+from summarizer import summarize_video, parse_watch_history_html
 from embedder import get_embedding
 from search import add_to_index, search_memory, clear_memory
 import zipfile
@@ -16,10 +16,8 @@ user_id = "demo-user"
 # Step 1: Upload history
 # Step 1: Upload watch history JSON or ZIP
 st.header("1. Upload your YouTube Watch History")
-uploaded_file = st.file_uploader(
-    "Upload your 'watch-history.json' or ZIP file from Google Takeout", 
-    type=["json", "zip"]
-)
+uploaded_file = st.file_uploader("Upload your YouTube 'watch-history.html' or ZIP file", type=["html", "zip", "json"])
+
 
 if uploaded_file:
     # Determine file type
@@ -34,6 +32,10 @@ if uploaded_file:
             if data is None:
                 st.error("Could not find 'watch-history.json' inside the ZIP file.")
                 st.stop()
+    elif uploaded_file.name.endswith(".html"):
+        html_bytes = uploaded_file.read()
+        data = parse_watch_history_html(html_bytes)
+
     else:
         # Assume JSON
         data = json.load(uploaded_file)
