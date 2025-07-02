@@ -6,68 +6,56 @@ import faiss
 from embedder import get_embedding
 import random
 
+# In-memory storage for each user
+memory_index: Dict[str, List[Dict]] = {}
 
-def add_to_index(user_id: str, video_id: str, title: str, summary: str, embedding: np.ndarray):
-    index_path = f"index_{user_id}.faiss"
-    memory_path = f"memory_{user_id}.json"
-
-    # Load or create FAISS index
-    if os.path.exists(index_path):
-        index = faiss.read_index(index_path)
-    else:
-        index = faiss.IndexFlatL2(embedding.shape[0])
-
-    # Add embedding to index
-    index.add(np.expand_dims(embedding, axis=0).astype(np.float32))  # type: ignore
-    faiss.write_index(index, index_path)
-
-    # Append metadata to JSON
-    metadata = {
-        "video_id": video_id,
+def add_to_index(user_id: str, title: str, summary: str, url: str, embedding: np.ndarray):
+    """
+    Add a memory item (video) to a user's memory index.
+    """
+    if user_id not in memory_index:
+        memory_index[user_id] = []
+    
+    memory_index[user_id].append({
         "title": title,
-        "summary": summary
-    }
-    if os.path.exists(memory_path):
-        with open(memory_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        data = []
-    data.append(metadata)
-    with open(memory_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        "summary": summary,
+        "url": url,
+        "embedding": embedding
+    })
 
-
-def search_memory(user_id: str, query: str) -> List[Dict]:
-    index_path = f"index_{user_id}.faiss"
-    memory_path = f"memory_{user_id}.json"
-    if not os.path.exists(index_path) or not os.path.exists(memory_path):
+def search_memory(user_id: str, query_embedding: np.ndarray, top_k: int = 5) -> List[Dict]:
+    """
+    Search the user's memory index for the closest matching items using cosine similarity.
+    """
+    if user_id not in memory_index or not memory_index[user_id]:
         return []
+    
+    memories = memory_index[user_id]
+    scored = []
 
-    # Load index and metadata
-    index = faiss.read_index(index_path)
-    with open(memory_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    for item in memories:
+        sim = cosine_similarity(query_embedding, item["embedding"])
+        scored.append((sim, item))
+    
+    scored.sort(reverse=True, key=lambda x: x[0])
+    top_matches = [item for _, item in scored[:top_k]]
+    return top_matches
 
-    # Embed query
-    query_vec = get_embedding(query).astype(np.float32)
-    D, I = index.search(np.expand_dims(query_vec, axis=0), k=min(3, len(data)))
+def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """
+    Compute cosine similarity between two vectors.
+    """
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return float(np.dot(vec1, vec2) / (norm1 * norm2))
 
-    results = []
-    for idx in I[0]:
-        if idx < 0 or idx >= len(data):
-            continue
-        item = data[idx]
-        video_id = item["video_id"]
-        # YouTube thumbnail URL format
-        thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-        results.append({
-            "video_id": video_id,
-            "title": item["title"],
-            "summary": item["summary"],
-            "thumbnail_url": thumbnail_url
-        })
-    return results
-
+def clear_memory(user_id: str):
+    """
+    Clear all stored memory for a user.
+    """
+    memory_index[user_id] = []
 
 def generate_dummy_data(user_id: str):
     """
@@ -93,12 +81,4 @@ def generate_dummy_data(user_id: str):
     for video in fake_videos:
         # Generate a random embedding of the correct dimension (384)
         embedding = np.random.rand(384).astype(np.float32)
-        add_to_index(user_id, video["video_id"], video["title"], video["summary"], embedding)
-
-def clear_memory(user_id: str):
-    index_path = f"index_{user_id}.faiss"
-    memory_path = f"memory_{user_id}.json"
-    if os.path.exists(index_path):
-        os.remove(index_path)
-    if os.path.exists(memory_path):
-        os.remove(memory_path) 
+        add_to_index(user_id, video["title"], video["summary"], "", embedding) 

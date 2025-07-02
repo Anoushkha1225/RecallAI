@@ -1,51 +1,63 @@
 import streamlit as st
+import json
 from summarizer import summarize_video
 from embedder import get_embedding
 from search import add_to_index, search_memory, clear_memory
-import os
 
-# Mock user_id for session
-if 'user_id' not in st.session_state:
-    st.session_state['user_id'] = 'demo-user'
-user_id = st.session_state['user_id']
+# Page configuration
+st.set_page_config(page_title="RecallAI", page_icon="🔍", layout="centered")
 
-st.title("RecallAI")
+st.title("RecallAI 🔍")
+st.markdown("**Your AI-powered memory for videos you've watched.**")
+st.markdown("💡 Describe the vibe, person, topic — and RecallAI will help you remember.")
 
-# Section 1: Add YouTube video to memory
-st.header("Add YouTube Video to Memory")
-with st.form("add_video_form"):
-    video_id = st.text_input("YouTube Video ID")
-    title = st.text_input("Video Title")
-    submitted = st.form_submit_button("Summarize and Add to Memory")
-    if submitted and video_id and title:
-        with st.spinner("Summarizing video..."):
-            summary = summarize_video(video_id)
-        if summary.startswith("Transcript unavailable") or summary.startswith("An error occurred"):
-            st.error(summary)
-        else:
-            embedding = get_embedding(summary)
-            add_to_index(user_id, video_id, title, summary, embedding)
-            st.success("Video summary added to memory!")
-            st.write("**Summary:**", summary)
+# Step 0: Username input (simulates login)
+st.header("👤 User Login")
+user_id = st.text_input("Enter your username (e.g., anshu123)", value="demo-user")
 
-# Section 2: Search memory
-st.header("Search Memory")
-with st.form("search_form"):
-    query = st.text_input("Enter your search query")
-    search_submitted = st.form_submit_button("Search")
-    if search_submitted and query:
-        with st.spinner("Searching memory..."):
-            results = search_memory(user_id, query)
-        if not results:
-            st.info("No results found.")
-        else:
-            for result in results:
-                st.subheader(result['title'])
-                st.image(f"https://img.youtube.com/vi/{result['video_id']}/0.jpg", width=320)
-                st.write(result['summary'])
+# Step 1: Upload watch history JSON
+st.header("1. Upload your YouTube Watch History")
+uploaded_file = st.file_uploader("Upload your 'watch-history.json' file", type="json")
 
-# Section 3: Clear memory
-st.header("Memory Management")
-if st.button("Clear My Memory"):
+if uploaded_file:
+    try:
+        data = json.load(uploaded_file)
+    except Exception:
+        st.error("❌ Failed to read the JSON file. Please upload a valid YouTube watch-history.json.")
+        st.stop()
+
+    if not any("title" in entry and "titleUrl" in entry for entry in data):
+        st.error("This doesn't look like a valid YouTube watch-history file.")
+        st.stop()
+
     clear_memory(user_id)
-    st.success("Your memory has been cleared!")
+    count = 0
+    for entry in data:
+        if "titleUrl" in entry and "title" in entry:
+            url = entry["titleUrl"]
+            title = entry["title"]
+            summary = summarize_video(title)
+            embedding = get_embedding(summary)
+            add_to_index(user_id, title, summary, url, embedding)
+            count += 1
+
+    st.success(f"✅ Added {count} videos to your memory.")
+
+st.markdown("📥 [How to Download Your Watch History from Google Takeout](https://takeout.google.com/)")
+
+# Step 2: Search from memory
+st.header("2. Search with a vague description")
+query = st.text_input("What do you remember about the video?")
+
+if query:
+    query_embedding = get_embedding(query)
+    results = search_memory(user_id, query_embedding)
+
+    if results:
+        st.subheader("🔍 Top Matches:")
+        for result in results:
+            st.markdown(f"### [{result['title']}]({result['url']})")
+            st.markdown(f"**Summary:** {result['summary']}")
+            st.markdown("---")
+    else:
+        st.warning("😕 No matches found. Try describing the topic, emotion, or keywords more clearly.")
