@@ -93,4 +93,12 @@ def generate_dummy_data(user_id: str):
     for video in fake_videos:
         # Generate a random embedding of the correct dimension (384)
         embedding = np.random.rand(384).astype(np.float32)
-        add_to_index(user_id, video["video_id"], video["title"], video["summary"], embedding) 
+        add_to_index(user_id, video["video_id"], video["title"], video["summary"], embedding)
+
+def clear_memory(user_id: str):
+    index_path = f"index_{user_id}.faiss"
+    memory_path = f"memory_{user_id}.json"
+    if os.path.exists(index_path):
+        os.remove(index_path)
+    if os.path.exists(memory_path):
+        os.remove(memory_path) 

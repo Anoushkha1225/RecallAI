@@ -1,8 +1,11 @@
 from youtube_transcript_api._api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
-from transformers.pipelines import pipeline
+from transformers import PegasusForConditionalGeneration, PegasusTokenizer
+import urllib.parse
 
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+model_name = "google/pegasus-xsum"
+tokenizer = PegasusTokenizer.from_pretrained(model_name)
+model = PegasusForConditionalGeneration.from_pretrained(model_name)
 
 def summarize_video(video_id: str) -> str:
     """
@@ -18,5 +21,18 @@ def summarize_video(video_id: str) -> str:
         return f"An error occurred: {str(e)}"
 
     # BART has a max token limit, so chunk if needed (not handled here for brevity)
-    summary = summarizer(full_text, max_length=180, min_length=60, do_sample=False)[0]['summary_text']
-    return summary 
+    summary = summarize_text(full_text)
+    return summary
+
+def summarize_text(text: str) -> str:
+    # Tokenize and prepare input
+    tokens = tokenizer(text, truncation=True, padding="longest", return_tensors="pt")
+    # Generate summary ids
+    summary_ids = model.generate(**tokens, max_length=60, min_length=20, num_beams=4, early_stopping=True)
+    # Decode summary
+    return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+
+def extract_video_id(url):
+    parsed = urllib.parse.urlparse(url)
+    qs = urllib.parse.parse_qs(parsed.query)
+    return qs.get('v', [None])[0] 

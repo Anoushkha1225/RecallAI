@@ -1,7 +1,7 @@
 import streamlit as st
 from summarizer import summarize_video
 from embedder import get_embedding
-from search import add_to_index, search_memory
+from search import add_to_index, search_memory, clear_memory
 import os
 
 # Mock user_id for session
@@ -47,16 +47,5 @@ with st.form("search_form"):
 # Section 3: Clear memory
 st.header("Memory Management")
 if st.button("Clear My Memory"):
-    index_path = f"index_{user_id}.faiss"
-    memory_path = f"memory_{user_id}.json"
-    removed = False
-    if os.path.exists(index_path):
-        os.remove(index_path)
-        removed = True
-    if os.path.exists(memory_path):
-        os.remove(memory_path)
-        removed = True
-    if removed:
-        st.success("Your memory has been cleared!")
-    else:
-        st.info("No memory to clear.")
+    clear_memory(user_id)
+    st.success("Your memory has been cleared!")
