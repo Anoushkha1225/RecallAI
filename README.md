@@ -1,1 +1,1 @@
- 
+Recall AI is an intelligent system designed to combat the spread of misinformation. Leveraging Natural Language Processing (NLP) and machine learning, it analyzes news articles, headlines, and social media content to classify them as real or fake. The system cross-references trusted news sources and detects sensational or manipulated language patterns to ensure users receive only factual content. It can be integrated with browsers or social platforms for real-time alerts. 
